@@ -1,0 +1,494 @@
+"""compchem-tools MCP server: Domain tools for computational chemistry."""
+
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+from fastmcp import FastMCP
+
+from compchem_tools.tools.haddock3 import (
+    haddock3_run as _haddock3_run,
+    haddock3_parse_results as _haddock3_parse,
+    generate_restraints as _generate_restraints,
+    run_acpype as _run_acpype,
+)
+from compchem_tools.tools.preprocess import (
+    preprocess_pdb as _preprocess_pdb,
+    validate_structure as _validate_structure,
+)
+from compchem_tools.tools.environment import (
+    check_environment as _check_environment,
+)
+from compchem_tools.tools.gnina import (
+    gnina_dock as _gnina_dock,
+    gnina_parse_results as _gnina_parse,
+)
+from compchem_tools.tools.covalent import (
+    smarts_validate as _smarts_validate,
+    alkyne_to_vinyl as _alkyne_to_vinyl,
+)
+from compchem_tools.tools.xtb import (
+    xtb_optimize as _xtb_optimize,
+    xtb_singlepoint as _xtb_singlepoint,
+)
+from compchem_tools.tools.orca import (
+    orca_setup as _orca_setup,
+    orca_run as _orca_run,
+    orca_parse as _orca_parse,
+)
+from compchem_tools.tools.gaussian import (
+    gaussian_setup as _gaussian_setup,
+    gaussian_run as _gaussian_run,
+    gaussian_parse as _gaussian_parse,
+)
+from compchem_tools.tools.jobs import (
+    submit_job as _submit_job,
+    check_job as _check_job,
+    cancel_job as _cancel_job,
+)
+from compchem_tools.tools.p2rank import (
+    p2rank_predict as _p2rank_predict,
+)
+from compchem_tools.tools.gromacs import (
+    gromacs_setup as _gromacs_setup,
+    gromacs_run as _gromacs_run,
+    gromacs_parse as _gromacs_parse,
+)
+from compchem_tools.tools.workflow import (
+    load_workflow as _load_workflow,
+    get_workflow_status as _get_workflow_status,
+)
+from compchem_tools.gates import GATE_REGISTRY
+
+SKILLS_DIR = os.environ.get(
+    "MAGNOLIA_SKILLS_DIR", os.path.expanduser("~/.magnolia/skills")
+)
+PROJECT_DIR = os.environ.get("MAGNOLIA_PROJECT_DIR", ".")
+
+mcp = FastMCP("compchem-tools")
+
+
+# ── Phase 1: HADDOCK3 Tools ──────────────────────────────────────────────────
+
+
+@mcp.tool()
+def haddock3_run(
+    config_path: str,
+    run_dir: str | None = None,
+    ncores: int = 40,
+    mode: str = "local",
+    restart_from: int | None = None,
+) -> str:
+    """Validate inputs, write config if needed, launch haddock3 in the run directory.
+    Returns run directory path and PID."""
+    result = _haddock3_run(config_path, run_dir, ncores, mode, restart_from)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def haddock3_parse_results(run_dir: str) -> str:
+    """Parse caprieval/clustfcc/seletopclusts outputs.
+    Returns structured metrics (best score, cluster count, LRMSD range)."""
+    result = _haddock3_parse(run_dir)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def preprocess_pdb(
+    input_path: str,
+    output_path: str | None = None,
+    add_chain_id: str | None = None,
+    remove_waters: bool = True,
+    fix_atom_names: bool = True,
+) -> str:
+    """Add chain IDs, fix atom names, remove waters. Returns path to cleaned PDB."""
+    result = _preprocess_pdb(
+        input_path, output_path, add_chain_id, remove_waters, fix_atom_names
+    )
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def generate_restraints(
+    actpass_file_1: str,
+    actpass_file_2: str,
+    output_path: str,
+    segid_one: str | None = None,
+    segid_two: str | None = None,
+) -> str:
+    """From actpass files, run haddock3-restraints active_passive_to_ambig.
+    Returns path to ambig.tbl."""
+    result = _generate_restraints(
+        actpass_file_1, actpass_file_2, output_path, segid_one, segid_two
+    )
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def run_acpype(
+    input_file: str,
+    charge_method: str = "bcc",
+    output_dir: str | None = None,
+) -> str:
+    """Run ACPYPE for ligand parameterisation. Post-process atom types to uppercase.
+    Returns paths to .top and .par files."""
+    result = _run_acpype(input_file, charge_method, output_dir)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def validate_structure(
+    input_path: str,
+    expected_format: str | None = None,
+) -> str:
+    """Basic sanity checks on PDB/SDF: atom count, chain IDs present, non-zero
+    size, parseable by a structure library."""
+    result = _validate_structure(input_path, expected_format)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def check_environment(
+    tool_name: str,
+    min_version: str | None = None,
+    check_conda: bool = False,
+) -> str:
+    """Verify that a given tool binary is available, report version, check conda env."""
+    result = _check_environment(tool_name, min_version, check_conda)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def stage_gate(
+    gate_name: str,
+    working_directory: str,
+) -> str:
+    """Run a named gate check (e.g. 'docking_inputs_ready').
+    Takes gate name + working directory. Returns pass/fail with details."""
+    if gate_name not in GATE_REGISTRY:
+        available = ", ".join(sorted(GATE_REGISTRY.keys()))
+        return json.dumps(
+            {"error": f"Unknown gate: {gate_name}", "available_gates": available},
+            indent=2,
+        )
+
+    gate_fn = GATE_REGISTRY[gate_name]
+    if gate_name in ("pdb_has_chain_id",):
+        return json.dumps(gate_fn(working_directory), indent=2)
+
+    result = gate_fn(working_directory)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def check_run_status(run_dir: str) -> str:
+    """Check if a computation run has completed by looking for output files
+    and process status."""
+    rdir = Path(run_dir)
+    output_dir = rdir / "output"
+
+    result: dict[str, Any] = {
+        "run_dir": str(rdir),
+        "exists": rdir.exists(),
+        "output_dir_exists": output_dir.exists(),
+        "completed": False,
+        "modules": [],
+    }
+
+    if output_dir.exists():
+        modules = sorted([d.name for d in output_dir.iterdir() if d.is_dir()])
+        result["modules"] = modules
+
+        io_jsons = list(output_dir.glob("*/io.json"))
+        if io_jsons:
+            try:
+                last_io = sorted(io_jsons)[-1]
+                io_data = json.loads(last_io.read_text())
+                if io_data.get("finished"):
+                    result["completed"] = True
+            except Exception:
+                pass
+
+        log_file = rdir / "log"
+        if log_file.exists():
+            last_line = log_file.read_text().strip().split("\n")[-1]
+            result["log_last_line"] = last_line
+
+    return json.dumps(result, indent=2)
+
+
+# ── Phase 3: Gnina / Covalent / xTB Tools ───────────────────────────────────
+
+
+@mcp.tool()
+def gnina_dock(
+    receptor: str,
+    ligand: str,
+    out_dir: str | None = None,
+    center_x: float | None = None,
+    center_y: float | None = None,
+    center_z: float | None = None,
+    size_x: float = 25.0,
+    size_y: float = 25.0,
+    size_z: float = 25.0,
+    num_modes: int = 20,
+    exhaustiveness: int = 8,
+    covalent: bool = False,
+    covalent_receptor_atom: str | None = None,
+    covalent_ligand_atom_pattern: str | None = None,
+) -> str:
+    """Run Gnina molecular docking (classical or covalent mode).
+    Returns paths to output poses and scores."""
+    result = _gnina_dock(
+        receptor, ligand, out_dir, None,
+        center_x, center_y, center_z,
+        size_x, size_y, size_z,
+        num_modes, exhaustiveness, None,
+        covalent, covalent_receptor_atom, covalent_ligand_atom_pattern,
+    )
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def gnina_parse_results(run_dir: str) -> str:
+    """Parse Gnina docking output SDF for scores and pose information."""
+    result = _gnina_parse(run_dir)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def smarts_validate(smarts: str, smiles: str | None = None) -> str:
+    """Validate a SMARTS pattern. Optionally check it matches a SMILES molecule.
+    Returns validity and match count."""
+    result = _smarts_validate(smarts, smiles)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def alkyne_to_vinyl(alkyne_smiles: str, output_dir: str | None = None) -> str:
+    """Convert an alkyne SMILES to Z and E vinyl isomers for covalent docking.
+    Returns isomer SMILES strings."""
+    result = _alkyne_to_vinyl(alkyne_smiles, output_dir)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def xtb_optimize(
+    input_file: str,
+    output_dir: str | None = None,
+    method: str = "gfn2",
+    charge: int = 0,
+    uhf: int = 0,
+    solvent: str | None = None,
+    ncores: int = 4,
+) -> str:
+    """Run xTB geometry optimization (GFN2-xTB). Returns optimized structure and energy."""
+    result = _xtb_optimize(input_file, output_dir, method, charge, uhf, solvent, ncores=ncores)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def xtb_singlepoint(
+    input_file: str,
+    output_dir: str | None = None,
+    method: str = "gfn2",
+    charge: int = 0,
+    uhf: int = 0,
+    solvent: str | None = None,
+    ncores: int = 4,
+) -> str:
+    """Run xTB single-point energy calculation. Returns energy and properties."""
+    result = _xtb_singlepoint(input_file, output_dir, method, charge, uhf, solvent, ncores=ncores)
+    return json.dumps(result, indent=2)
+
+
+# ── Phase 4: Workflow / P2Rank / GROMACS Tools ───────────────────────────────
+
+
+@mcp.tool()
+def workflow_load(template_path: str) -> str:
+    """Load and validate a YAML workflow template. Returns the workflow plan."""
+    result = _load_workflow(template_path)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def workflow_status(run_dir: str) -> str:
+    """Check which steps in a workflow are complete based on output files."""
+    result = _get_workflow_status(run_dir)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def p2rank_predict(
+    protein: str,
+    output_dir: str | None = None,
+    threads: int = 4,
+) -> str:
+    """Run P2Rank pocket prediction on a protein structure.
+    Returns ranked pocket list with scores and residues."""
+    result = _p2rank_predict(protein, output_dir, threads)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def gromacs_setup(
+    structure: str,
+    topology: str | None = None,
+    forcefield: str = "amber99sb-ildn",
+    water: str = "tip3p",
+    box_type: str = "dodecahedron",
+    box_distance: float = 1.0,
+    output_dir: str | None = None,
+) -> str:
+    """Set up a GROMACS MD simulation: generate topology, box, solvate, ions.
+    Returns paths to .gro, .top, and other setup files."""
+    result = _gromacs_setup(
+        structure, topology, forcefield, water, box_type, box_distance, output_dir
+    )
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def gromacs_run(
+    tpr_file: str,
+    output_dir: str | None = None,
+    ncores: int = 4,
+) -> str:
+    """Run a GROMACS MD simulation from a .tpr file.
+    Returns paths to trajectory, energy, and log files."""
+    result = _gromacs_run(tpr_file, output_dir, ncores)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def gromacs_parse(
+    energy_file: str | None = None,
+    trajectory: str | None = None,
+) -> str:
+    """Parse GROMACS output: extract energy terms from .edr and trajectory info."""
+    result = _gromacs_parse(energy_file, trajectory)
+    return json.dumps(result, indent=2)
+
+
+# ── Phase 5: ORCA / Gaussian / Job Management Tools ─────────────────────────
+
+
+@mcp.tool()
+def orca_setup(
+    input_file: str,
+    method: str = "B3LYP",
+    basis: str = "def2-SVP",
+    charge: int = 0,
+    multiplicity: int = 1,
+    task: str = "SP",
+    solvent: str | None = None,
+    output_dir: str | None = None,
+    ncores: int = 4,
+) -> str:
+    """Generate ORCA input file from coordinates.
+    Returns path to the generated .inp file."""
+    result = _orca_setup(
+        input_file, method, basis, charge, multiplicity, task, solvent, output_dir, ncores
+    )
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def orca_run(
+    input_file: str,
+    output_dir: str | None = None,
+    ncores: int = 4,
+) -> str:
+    """Run ORCA calculation from an .inp file.
+    Returns paths to output files."""
+    result = _orca_run(input_file, output_dir, ncores)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def orca_parse(output_file: str) -> str:
+    """Parse ORCA output for energy, HOMO-LUMO gap, and converged geometry."""
+    result = _orca_parse(output_file)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def gaussian_setup(
+    input_file: str,
+    method: str = "B3LYP",
+    basis: str = "6-31G*",
+    charge: int = 0,
+    multiplicity: int = 1,
+    task: str = "SP",
+    output_dir: str | None = None,
+) -> str:
+    """Generate Gaussian .com input file from coordinates.
+    Returns path to the generated .com file."""
+    result = _gaussian_setup(input_file, method, basis, charge, multiplicity, task, output_dir)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def gaussian_run(
+    input_file: str,
+    output_dir: str | None = None,
+    ncores: int = 4,
+) -> str:
+    """Run Gaussian calculation from a .com file.
+    Returns paths to output files."""
+    result = _gaussian_run(input_file, output_dir, ncores)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def gaussian_parse(output_file: str) -> str:
+    """Parse Gaussian .log output for energy, HOMO-LUMO, and frequencies."""
+    result = _gaussian_parse(output_file)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def submit_job(
+    command: str,
+    working_dir: str,
+    scheduler: str = "slurm",
+    job_name: str = "compchem",
+    ncores: int = 4,
+    memory: str = "4GB",
+    time_limit: str = "24:00:00",
+    partition: str | None = None,
+) -> str:
+    """Submit a job to Slurm, PBS, or run locally.
+    Returns job ID and submission details."""
+    result = _submit_job(
+        command, working_dir, scheduler, job_name, ncores, memory, time_limit, partition
+    )
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def check_job(
+    job_id: str,
+    scheduler: str = "slurm",
+) -> str:
+    """Check job status on Slurm, PBS, or local.
+    Returns current status information."""
+    result = _check_job(job_id, scheduler)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def cancel_job(
+    job_id: str,
+    scheduler: str = "slurm",
+) -> str:
+    """Cancel a running job on Slurm, PBS, or local.
+    Returns cancellation status."""
+    result = _cancel_job(job_id, scheduler)
+    return json.dumps(result, indent=2)
+
+
+if __name__ == "__main__":
+    mcp.run()

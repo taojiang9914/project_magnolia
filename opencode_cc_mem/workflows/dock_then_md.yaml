@@ -1,0 +1,24 @@
+name: dock_then_md
+description: Dock-then-MD workflow for refining docking poses with molecular dynamics
+steps:
+  - name: predict_pockets
+    tool: p2rank_predict
+    gate: at_least_one_pocket
+    outputs: [predictions.csv]
+  - name: dock
+    tool: haddock3_run
+    gate: docking_inputs_ready
+    depends_on: [predict_pockets]
+    outputs: [output/]
+  - name: md_setup
+    tool: gromacs_setup
+    depends_on: [dock]
+    outputs: [processed.gro, topol.top]
+  - name: md_run
+    tool: gromacs_run
+    depends_on: [md_setup]
+    outputs: [md.xtc, md.edr, md.log]
+  - name: md_analysis
+    tool: gromacs_parse
+    depends_on: [md_run]
+    outputs: [energy.xvg]
