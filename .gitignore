@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Test / cache
+.pytest_cache/
+.pytest_cache
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.venv/
+venv/
+.env
+
+# Magnolia runtime data
+.magnolia/
+
+# Reference files
+old_files/
