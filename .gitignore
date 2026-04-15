@@ -28,3 +28,7 @@ old_files/
 # OpenCode CC mem — local project workspaces and vendored software/cache
 opencode_cc_mem/projects/
 opencode_cc_mem/softwares/
+
+# v1 
+opencode_3_tier_mem/opencode_3_tier_mem/
+opencode_3_tier_mem/
