@@ -1,54 +1,66 @@
 # Project Magnolia
 
-**Your AI assistant for computational chemistry**
+**A quick-learning intern for computational chemistry**
 
-Project Magnolia is like having a smart research assistant who can run scientific software, design molecules, and keep detailed notes — all by chatting with it in plain English.
+Project Magnolia is like hiring a very bright research intern who reads fast, runs experiments, writes detailed lab notes — and never forgets what you taught them. You work with Magnolia by chatting in plain English, giving it tasks, correcting it when needed, and building up a shared body of knowledge over time.
+
+---
+
+## What is Magnolia, really?
+
+Think of Magnolia as an **intern**, not a magic box.
+
+- It can **install and run** scientific software (docking, design, simulation)
+- It can **read your old results** and summarize what happened
+- It can **design new experiments** based on what it learned
+- It **takes notes automatically** in a project notebook so you don't have to remember every detail
+- But like any intern, it works best when you give it **clear instructions**, point it to the right files, and **correct it** when it goes off track
+
+The more you work with it, the better it gets — because it remembers your project's history.
 
 ---
 
 ## What can it do?
 
-Magnolia can help you with tasks like:
+Magnolia can help with tasks like:
 
-- **Molecular docking** — predict how a small peptide or drug binds to a protein
-- **De novo design** — generate new peptide or protein sequences that might bind better
-- **Pocket prediction** — find where on a protein a drug is most likely to stick
-- **Run tracking** — remember which method worked best, so you don't have to keep notes by hand
-
-Think of it as a lab notebook that can also press the "run" button on your experiments.
+- **Molecular docking** — predict how a peptide or drug binds to a protein
+- **De novo design** — generate new sequences that might bind better
+- **Pocket prediction** — find the best spots on a protein for a drug to stick
+- **Run tracking** — keep a lab notebook of which methods worked and which didn't
 
 ---
 
 ## How do I talk to it?
 
-You chat with Magnolia using a program called **OpenCode** (or any compatible AI client). You simply type what you want in normal sentences, for example:
+You chat with Magnolia using a program like **OpenCode**. Just type what you want in normal sentences, the same way you'd explain a task to a student in your lab:
 
-> *"I want to dock this peptide onto my target protein and find the best binding pose."*
+> *"I want to dock this peptide onto my target protein and find the best binding pose. The files are in `projects/my_project/raw_input/`."*
 
-> *"Design me 10 new peptides that might bind more tightly."*
+> *"Design me 10 new peptides that might bind more tightly, but start with the the motif since that worked best before."*
 
-> *"What did we learn from the last run?"*
+> *"What did we learn from the last run? And did we ever try pocket 2?"*
 
-The assistant will figure out the steps, run the software, and tell you the results.
+Magnolia will figure out the steps, run the software, and report back. If it misunderstands, just correct it — like you would with a trainee.
 
 ---
 
 ## Key ideas (explained simply)
 
-### 1. The Agent
-The **agent** is the AI assistant itself — the part you chat with. It reads your request, decides which scientific tools to use, and reports back.
+### 1. The Intern
+Magnolia is the AI agent — the part you chat with. It reads your requests, looks up what it knows, decides which tool to use, and reports back. It is fast and eager, but it needs you to point it to the right folders and tell it what matters.
 
-### 2. The Memory System
-Magnolia keeps a **project notebook** automatically. It remembers:
+### 2. The Lab Notebook (Memory System)
+Every project has its own notebook at `projects/<name>/.magnolia/`. Magnolia writes down:
 - Which experiments you ran
-- What scores or results you got
-- Mistakes you hit and how they were fixed
-- Tips that worked well (for example: "p2rank pocket restraints work better than manual ones")
+- Scores and results
+- Errors you hit and how they were fixed
+- Rules that worked (for example: *"p2rank pocket restraints are better than manual restraints for this protein"*)
 
-This notebook lives inside your project folder, so if you move the project to another computer, the memories travel with it.
+Because the notebook lives inside your project folder, you can move the project to another computer and the intern still knows everything.
 
 ### 3. The Tools
-Scientific software like **HADDOCK3**, **BoltzGen**, and **GROMACS** are stored in a `softwares/` folder. Magnolia knows how to call each one so you don't have to learn dozens of different command-line programs.
+Scientific programs like **HADDOCK3**, **BoltzGen**, and **GROMACS** live in a `softwares/` folder. Magnolia knows how to call them, but it installs them in isolated "fenced yards" so they don't interfere with each other. You don't need to memorize command lines.
 
 ---
 
@@ -56,65 +68,66 @@ Scientific software like **HADDOCK3**, **BoltzGen**, and **GROMACS** are stored 
 
 ```
 project_magnolia/
-├── opencode_cc_mem/          # The "brain" of the assistant
-│   ├── rules/                # Instructions the AI follows
-│   ├── mcp-servers/          # Memory and tool connectors
+├── opencode_cc_mem/          # The "brain" and training of the intern
+│   ├── rules/                # Lab protocols the intern follows
+│   ├── mcp-servers/          # Connectors for memory and tools
 │   └── projects/             # Your actual science projects
-│       └── my_project/   # Example: peptide docking project
+│       └── my_project/   # Example project
 │           ├── raw_input/    # Your PDB files and sequences
-│           ├── runs/         # Results from docking or design
-│           └── .magnolia/    # The assistant's notebook for this project
-├── softwares/                # Scientific software (HADDOCK3, BoltzGen, etc.)
-│   ├── bin/                  # Shortcuts to run the tools
+│           ├── runs/         # Results from experiments
+│           └── .magnolia/    # The intern's notebook for this project
+├── softwares/                # Scientific software
+│   ├── bin/                  # Shortcuts to run tools
 │   ├── boltzgen/             # AI design tool
 │   └── manifest.yaml         # List of installed tools
 └── README.md                 # This file
 ```
 
-**You mainly work inside `opencode_cc_mem/projects/<your_project_name>/`.** Everything else is managed by the assistant.
+**You mainly work inside `opencode_cc_mem/projects/<your_project_name>/`.** Everything else is managed by Magnolia.
 
 ---
 
 ## Getting started
 
-1. **Make sure OpenCode (or your AI client) is pointed at this folder.**
-2. **Create a new project folder** under `opencode_cc_mem/projects/`, for example:
+1. **Make sure your AI client (OpenCode) is pointed at this folder.**
+2. **Create a new project folder**, for example:
    ```
    opencode_cc_mem/projects/my_docking_project/
    ```
-3. **Put your input files there** (for example: a protein PDB file and a peptide PDB file).
-4. **Tell the assistant what you want to do.**
+3. **Put your input files there** (for example, a protein PDB and a peptide PDB).
+4. **Tell Magnolia what you want**, including where the files are and what you have already tried.
 
-The assistant will:
+Magnolia will:
 - Check which tools are installed
-- Prepare the run
-- Execute it
-- Save the results in `runs/`
-- Write a summary in the project notebook
+- Suggest a plan
+- Run the experiment
+- Save results in `runs/`
+- Write a note in the project notebook
 
 ---
 
 ## Working with high-performance computers (HPC)
 
-In the future, you may want to run big calculations on a university cluster (using **Slurm** or similar queue systems). Magnolia is designed for this:
+Eventually you may want to run big calculations on a university cluster (using **Slurm**). Magnolia is designed for this:
 
 - It can submit jobs to the cluster for you.
-- The project notebook travels with your files, so the assistant can pick up where it left off when the cluster job finishes.
-- **Important:** The AI assistant runs on your personal computer; it does not need to run directly on the cluster.
+- The project notebook travels with your files, so when the cluster job finishes, Magnolia can read the results and continue.
+- **Important:** Magnolia runs on your personal computer. The cluster just runs the heavy calculations.
 
 ---
 
 ## Quick tips
 
-- **You don't need to memorize commands.** Just describe what you want.
-- **Check the notebook.** If you want to know what worked last time, ask the assistant or look in `projects/<name>/.magnolia/entries/`.
-- **Don't worry about installing software.** The assistant installs tools into the `softwares/` folder automatically when needed.
+- **Be specific.** The intern is smart, but it can't read your mind. Point it to files, mention prior runs, and say what you want changed.
+- **Correct it.** If Magnolia is about to do something wrong, say *"Wait — do it this way instead."* Good collaboration means steering.
+- **Check the notebook.** Ask *"What did we learn from the last run?"* or look in `projects/<name>/.magnolia/entries/`.
+- **Let it install tools.** Magnolia will install software into `softwares/` automatically when needed.
 
 ---
 
 ## Need help?
 
-If something goes wrong, just tell the assistant:
+If something goes wrong, just tell Magnolia:
 
 > *"That didn't work. Can you check the error and try again?"*
 
