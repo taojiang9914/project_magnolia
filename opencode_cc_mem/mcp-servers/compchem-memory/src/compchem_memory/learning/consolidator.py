@@ -61,12 +61,6 @@ def _resolve_entries_dir(base_dir: str) -> Path:
     if local.exists():
         return local
     global_base = Path.home() / ".magnolia"
-    from compchem_memory.storage import project_hash, get_global_project_dir
-
-    h = project_hash(base_dir)
-    global_entries = get_global_project_dir(base_dir) / "entries"
-    if global_entries.exists():
-        return global_entries
     return local
 
 

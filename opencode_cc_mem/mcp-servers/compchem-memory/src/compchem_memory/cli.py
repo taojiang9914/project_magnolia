@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from compchem_memory.storage import ensure_project_store
+from compchem_memory.storage import ensure_project_store, scaffold_obsidian_vault
 
 
 def cmd_log_bash(args: argparse.Namespace) -> int:
@@ -95,6 +95,65 @@ def cmd_sync_queue(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_init_vault(args: argparse.Namespace) -> int:
+    """Scaffold Obsidian vault configuration for the project."""
+    project_dir = args.project_dir or "."
+    obsidian_dir = scaffold_obsidian_vault(project_dir)
+    print(f"Obsidian vault scaffolded at {obsidian_dir}")
+    print("Open this project directory in Obsidian to use it as a vault.")
+    return 0
+
+
+def cmd_generate_daily_note(args: argparse.Namespace) -> int:
+    """Generate a daily note pre-populated with that day's memory data."""
+    from compchem_memory.notebook import generate_notebook
+
+    project_dir = args.project_dir or "."
+    local_dir = ensure_project_store(project_dir)
+
+    target_date = args.date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    md_content = generate_notebook(
+        project_dir=str(Path(project_dir).resolve()),
+        start_date=target_date,
+        end_date=target_date,
+    )
+
+    daily_dir = local_dir / "daily-notes"
+    daily_dir.mkdir(parents=True, exist_ok=True)
+    note_path = daily_dir / f"{target_date}.md"
+
+    if note_path.exists() and not args.overwrite:
+        print(f"Daily note already exists at {note_path}. Use --overwrite to replace.")
+        return 1
+
+    note_path.write_text(md_content)
+    print(f"Daily note generated at {note_path}")
+    return 0
+
+
+def cmd_compact_session(args: argparse.Namespace) -> int:
+    """Compact old session logs into summary notes to prevent unbounded growth."""
+    from compchem_memory.compaction import maybe_compact_session
+
+    project_dir = args.project_dir or "."
+    local_dir = ensure_project_store(project_dir)
+    sessions_dir = local_dir / "sessions"
+
+    compacted = 0
+    for session_file in sorted(sessions_dir.glob("*.jsonl")):
+        result = maybe_compact_session(session_file)
+        if result:
+            print(f"Compacted {session_file.name}")
+            compacted += 1
+
+    if compacted:
+        print(f"Compacted {compacted} session file(s).")
+    else:
+        print("No compaction needed.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="compchem-memory")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -122,6 +181,27 @@ def main() -> int:
     p_sync.add_argument("--project-dir", default=".")
     p_sync.add_argument("--delete-after", action="store_true")
     p_sync.set_defaults(func=cmd_sync_queue)
+
+    # init-vault
+    p_vault = subparsers.add_parser("init-vault", help="Scaffold Obsidian vault config")
+    p_vault.add_argument("--project-dir", default=".")
+    p_vault.set_defaults(func=cmd_init_vault)
+
+    # compact-session
+    p_compact = subparsers.add_parser(
+        "compact-session", help="Compact old session logs into summary notes"
+    )
+    p_compact.add_argument("--project-dir", default=".")
+    p_compact.set_defaults(func=cmd_compact_session)
+
+    # generate-daily-note
+    p_daily = subparsers.add_parser(
+        "generate-daily-note", help="Generate daily lab note"
+    )
+    p_daily.add_argument("--project-dir", default=".")
+    p_daily.add_argument("--date", default="", help="Date YYYY-MM-DD (default: today)")
+    p_daily.add_argument("--overwrite", action="store_true")
+    p_daily.set_defaults(func=cmd_generate_daily_note)
 
     args = parser.parse_args()
     return args.func(args)
