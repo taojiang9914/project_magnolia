@@ -27,6 +27,8 @@ from compchem_memory.compaction import (
     compact_session_to_notes,
     estimate_tokens,
 )
+from compchem_memory.health import run_health_check
+from compchem_memory.notebook import generate_notebook
 from compchem_memory.storage import (
     SKILLS_DIR as _SKILLS_DIR,
     ensure_project_store,
@@ -508,6 +510,76 @@ def memory_scan_headers(
         },
         indent=2,
     )
+
+
+# ── Karpathy-style knowledge management tools ────────────────────────────────
+
+
+@mcp.tool()
+def memory_health_check(
+    project_dir: str | None = None,
+    stale_days: int = 90,
+    min_confidence: float = 0.3,
+    fix: bool = False,
+) -> str:
+    """Audit the knowledge base for staleness, contradictions, gaps, and orphaned entries.
+    Returns a structured report. Default mode is dry-run (no side effects).
+    Set fix=True to auto-resolve safe issues (remove broken refs, mark stale entries)."""
+    pd = _resolve_project_store(project_dir)
+    result = run_health_check(
+        project_dir=pd,
+        stale_days=stale_days,
+        min_confidence=min_confidence,
+        fix=fix,
+    )
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def memory_notebook(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    section: str | None = None,
+    project_dir: str | None = None,
+) -> str:
+    """Generate a chronological lab notebook timeline from sessions, runs, and entries.
+    Returns markdown. Optionally filter by date range or section (entries, runs, sessions).
+    This is a read-only view tool — it does not modify any data."""
+    pd = _resolve_project_store(project_dir)
+    return generate_notebook(
+        project_dir=pd,
+        start_date=start_date,
+        end_date=end_date,
+        section=section,
+    )
+
+
+@mcp.tool()
+def memory_annotate(
+    title: str,
+    content: str,
+    tags: list[str] | None = None,
+    references: list[str] | None = None,
+    notebook_section: str | None = None,
+    project_dir: str | None = None,
+) -> str:
+    """Create a human-authored lab notebook entry (type 'note') with optional
+    references (paper DOIs, PDB IDs, URLs) and notebook section label.
+    Entries are created directly in the active entries area (not staging)."""
+    pd = _resolve_project_store(project_dir)
+    proj_m = _get_project_mgr()
+    result = proj_m.create_entry(
+        pd,
+        title=title,
+        content=content,
+        tags=tags,
+        source="human_annotation",
+        staging=False,
+        entry_type="note",
+        references=references,
+        notebook_section=notebook_section,
+    )
+    return json.dumps({"status": "created", "path": result})
 
 
 # ── Resources (preserved from v1) ────────────────────────────────────────────

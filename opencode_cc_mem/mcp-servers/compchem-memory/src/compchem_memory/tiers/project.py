@@ -61,6 +61,8 @@ class ProjectManager:
         tools: list[str] | None = None,
         confidence: float = 0.5,
         related_entries: list[str] | None = None,
+        references: list[str] | None = None,
+        notebook_section: str | None = None,
     ) -> str:
         if entry_type not in ENTRY_TYPES:
             entry_type = "note"
@@ -92,6 +94,10 @@ class ProjectManager:
         }
         if related_entries:
             frontmatter["related_entries"] = related_entries
+        if references:
+            frontmatter["references"] = references
+        if notebook_section:
+            frontmatter["notebook_section"] = notebook_section
         fm_str = "---\n" + yaml.dump(frontmatter, default_flow_style=False) + "---\n"
         fpath.write_text(fm_str + "\n" + content + "\n")
         if not staging:
@@ -297,12 +303,40 @@ class ProjectManager:
         if not entries:
             lines.append("_No entries yet._\n")
         else:
+            # Group by type
+            by_type: dict[str, list[dict[str, Any]]] = {}
             for e in entries:
-                tags = ", ".join(e.get("tags", []))
-                entry_type = e.get("type", "note")
-                lines.append(
-                    f"- **{e['title']}** (`{e['name']}`) [{entry_type}] — {e['date']} [{tags}]\n"
-                )
+                t = e.get("type", "note")
+                if t not in by_type:
+                    by_type[t] = []
+                by_type[t].append(e)
+
+            lines.append(f"**Total entries:** {len(entries)}\n\n")
+
+            type_labels = {
+                "success_pattern": "Success Patterns",
+                "error_resolution": "Error Resolutions",
+                "parameter_guidance": "Parameter Guidance",
+                "workflow_note": "Workflow Notes",
+                "note": "Notes & Annotations",
+            }
+
+            for entry_type in ENTRY_TYPES:
+                group = by_type.get(entry_type, [])
+                if not group:
+                    continue
+                heading = type_labels.get(entry_type, entry_type.title())
+                lines.append(f"## {heading}\n\n")
+                for e in group:
+                    tags = ", ".join(e.get("tags", []))
+                    date = e.get("date", "")
+                    title = e["title"]
+                    stem = e["name"].replace(".md", "")
+                    lines.append(
+                        f"- [[{stem}]] **{title}** [{entry_type}] — {date} [{tags}]\n"
+                    )
+                lines.append("\n")
+
         index_path.write_text("".join(lines))
 
     def _update_runs_index(self, project_dir: str) -> None:

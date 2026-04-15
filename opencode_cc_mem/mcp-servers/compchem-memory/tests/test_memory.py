@@ -186,3 +186,63 @@ class TestMemoryIndex:
         assert len(entries) == 2
         tiers = {e["tier"] for e in entries}
         assert tiers == {"skill", "project"}
+
+
+class TestExtendedCreateEntry:
+    def test_create_with_references(self, project_dir):
+        mgr = ProjectManager(project_dir)
+        path = mgr.create_entry(
+            str(project_dir), "Paper Note", "Content",
+            references=["10.1021/jacs.1c12345", "PDB:1ABC"]
+        )
+        text = Path(path).read_text()
+        assert "10.1021/jacs.1c12345" in text
+        assert "PDB:1ABC" in text
+
+    def test_create_with_notebook_section(self, project_dir):
+        mgr = ProjectManager(project_dir)
+        path = mgr.create_entry(
+            str(project_dir), "Section Note", "Content",
+            notebook_section="docking_results"
+        )
+        text = Path(path).read_text()
+        assert "docking_results" in text
+
+    def test_create_without_new_fields_unchanged(self, project_dir):
+        mgr = ProjectManager(project_dir)
+        path = mgr.create_entry(str(project_dir), "Normal Entry", "Content")
+        text = Path(path).read_text()
+        assert "references" not in text
+        assert "notebook_section" not in text
+
+
+class TestExtendedIndex:
+    def test_index_has_wikilinks(self, project_dir):
+        mgr = ProjectManager(project_dir)
+        mgr.create_entry(str(project_dir), "Linked Entry", "Content", tags=["test"])
+        index_path = project_dir / ".magnolia" / "entries" / "INDEX.md"
+        text = index_path.read_text()
+        assert "[[" in text  # wikilink syntax
+
+    def test_index_has_type_sections(self, project_dir):
+        mgr = ProjectManager(project_dir)
+        mgr.create_entry(
+            str(project_dir), "Error Fix", "Content",
+            entry_type="error_resolution", tags=["test"]
+        )
+        mgr.create_entry(
+            str(project_dir), "Success", "Content",
+            entry_type="success_pattern", tags=["test"]
+        )
+        index_path = project_dir / ".magnolia" / "entries" / "INDEX.md"
+        text = index_path.read_text()
+        assert "## Error Resolutions" in text
+        assert "## Success Patterns" in text
+
+    def test_index_backward_compat_header(self, project_dir):
+        mgr = ProjectManager(project_dir)
+        mgr.create_entry(str(project_dir), "Test", "Content")
+        index_path = project_dir / ".magnolia" / "entries" / "INDEX.md"
+        text = index_path.read_text()
+        assert text.startswith("# Project-Tier Entry Index")
+        assert "**Last updated:**" in text

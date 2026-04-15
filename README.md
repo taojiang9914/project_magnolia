@@ -59,6 +59,14 @@ Every project has its own notebook at `projects/<name>/.magnolia/`. Magnolia wri
 
 Because the notebook lives inside your project folder, you can move the project to another computer and the intern still knows everything.
 
+The notebook is also **browseable in Obsidian** — entries are stored as Markdown files with wikilinks, tags, and cross-references. You can open `.magnolia/` as an Obsidian vault to visually explore your project's knowledge base using the graph view, backlinks, and search.
+
+You can also add your own annotations — just tell Magnolia:
+> *"Note that this docking failed because the peptide was too flexible."*
+> *"Record that paper DOI 10.1021/... suggests using AIR restraints for this target."*
+
+These become permanent entries alongside the auto-generated ones.
+
 ### 3. The Tools
 Scientific programs like **HADDOCK3**, **BoltzGen**, and **GROMACS** live in a `softwares/` folder. Magnolia knows how to call them, but it installs them in isolated "fenced yards" so they don't interfere with each other. You don't need to memorize command lines.
 
@@ -90,12 +98,57 @@ project_magnolia/
 
 ## Getting started
 
-1. **Make sure your AI client (OpenCode) is pointed at this folder.**
+### 1. Choose an AI coding tool
+
+Magnolia is built around an **open-source full stack**. The agent harness is [OpenCode](https://github.com/anomalyco/opencode) — a free, open-source, terminal-based AI coding agent with MCP support. You bring your own API key or coding plan.
+
+Other MCP-compatible tools should also work (although not tested):
+
+| Tool | Cost | Notes |
+|------|------|-------|
+| [OpenCode](https://github.com/anomalyco/opencode) | Free + your API key | What this project was built with. 100% open source. |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Free tier / Anthropic API key | Anthropic's official CLI. |
+| [Aider](https://github.com/paul-gauthier/aider) | Free + your API key | Terminal-based AI pair programmer. Open source. |
+| [Cline](https://github.com/cline/cline) (VS Code) | Free + your API key | Autonomous coding agent in VS Code. Open source. |
+
+### 2. Choose a model provider
+
+OpenCode supports 75+ providers. You can use a **coding plan** (flat-rate subscription) or **pay-as-you-go** (API key, billed per token).
+
+**Coding plans** (recommended for heavy use):
+
+| Plan | Provider | Notes |
+|------|----------|-------|
+| **Kimi Coding Plan** (Moderato tier) | Moonshot AI | Budget-friendly. What I use daily. |
+| **GLM Coding Plan** | Z.AI (Zhipu AI) | Strong multilingual and coding capabilities. |
+| Claude Max | Anthropic | Higher usage limits than Pro tier — needed for extensive agent use. |
+| ChatGPT Plus / Pro | OpenAI | Versatile, widely available. |
+| GitHub Copilot | GitHub | Uses your existing Copilot subscription. |
+| OpenCode Zen | OpenCode | Curated, tested models from the OpenCode team. |
+
+**Pay-as-you-go API keys:**
+
+| Provider | Notes |
+|----------|-------|
+| Anthropic | Claude models, billed per token |
+| OpenAI | GPT models|
+| Google Vertex AI | Gemini models, large context window |
+| Moonshot AI | Kimi K2.5 via API |
+| DeepSeek | DeepSeek Reasoner |
+| OpenRouter | Aggregator — access many providers with one key |
+
+You can also run **local models** via Ollama, llama.cpp, or LM Studio at no cost beyond hardware.
+
+Connect your provider by typing `/connect` in OpenCode, then `/models` to pick a model.
+
+### 3. Set up a project
+
+1. **Launch your AI tool in this folder** — for example, open a terminal, `cd` into `project_magnolia/`, and type `opencode`. (The MCP servers are already configured in `opencode.json`.) If you prefer an IDE, extensions like Cline for VS Code work too — just open this folder as your workspace.
 2. **Create a new project folder**, for example:
    ```
    opencode_cc_mem/projects/my_docking_project/
    ```
-3. **Put your input files there** (for example, a protein PDB and a peptide PDB).
+3. **Put your input files in the project folder** (for example, a protein PDB and a peptide PDB).
 4. **Tell Magnolia what you want**, including where the files are and what you have already tried.
 
 **New to working with AI assistants?** Read [`WORKFLOW_GUIDE.md`](WORKFLOW_GUIDE.md) for a step-by-step example of how to supervise Magnolia effectively — from planning an experiment to analyzing results.
@@ -116,6 +169,27 @@ Eventually you may want to run big calculations on a university cluster (using *
 - It can submit jobs to the cluster for you.
 - The project notebook travels with your files, so when the cluster job finishes, Magnolia can read the results and continue.
 - **Important:** Magnolia runs on your personal computer. The cluster just runs the heavy calculations.
+- Use `magnolia-memory log-bash` and `magnolia-memory log-event` to log HPC job results, then `magnolia-memory sync-queue` to ingest them into the project notebook.
+
+---
+
+## Obsidian integration
+
+You can open any project's `.magnolia/` directory as an **Obsidian vault** to browse the knowledge base visually.
+
+```bash
+# Scaffold Obsidian vault config for a project
+magnolia-memory init-vault --project-dir opencode_cc_mem/projects/my_project
+
+# Generate a daily lab note from today's memory data
+magnolia-memory generate-daily-note --project-dir opencode_cc_mem/projects/my_project
+```
+
+Then open `projects/my_project/.magnolia/` as an Obsidian vault. You'll see:
+- **Wikilinks** between related entries
+- **Graph view** showing connections across your knowledge base
+- **Daily notes** summarizing session activity, runs, and entries
+- **INDEX.md** with entries grouped by type (success patterns, error resolutions, etc.)
 
 ---
 
