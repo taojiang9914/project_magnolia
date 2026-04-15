@@ -24,3 +24,7 @@ venv/
 
 # Reference files
 old_files/
+
+# OpenCode CC mem — local project workspaces and vendored software/cache
+opencode_cc_mem/projects/
+opencode_cc_mem/softwares/

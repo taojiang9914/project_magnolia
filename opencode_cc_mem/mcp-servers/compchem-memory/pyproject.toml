@@ -19,6 +19,9 @@ dev = [
     "pytest-asyncio>=0.21",
 ]
 
+[project.scripts]
+magnolia-memory = "compchem_memory.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
