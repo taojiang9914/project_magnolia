@@ -74,13 +74,13 @@ Below is a realistic conversation between a PI and Magnolia. The specific scienc
 ### Step 5: Ask for analysis, then use it
 
 **You:**
-> *"Can you perform contact analysis on those short peptides?"*
+> *"Can you analyze the binding contacts from those results?"*
 
 **Why this works:** This is a specific, bounded task with clear inputs.
 
-**Intern response pattern:** Magnolia analyzes contact maps and extracts rules like:
-- "Position 1 prefers a positive charge"
-- "Position 2 needs an aromatic residue"
+**Intern response pattern:** Magnolia analyzes the contact data and extracts rules like:
+- "Residue position 1 prefers a positive charge"
+- "Residue position 2 needs an aromatic residue"
 
 ---
 
@@ -134,11 +134,11 @@ Below is a realistic conversation between a PI and Magnolia. The specific scienc
 
 | Mistake | Why It Hurts | Better Alternative |
 |---------|-------------|-------------------|
-| *"Do docking"* | Intern doesn't know which system, files, or protocol | *"Dock the peptide in `raw_input/peptide.pdb` onto the protein in `raw_input/protein.pdb`. Use the same pocket restraints from my Jan 26 run."* |
-| *"Why is it slow?"* | No context on what's running | *"The HADDOCK3 job I started 20 minutes ago seems stuck. PID is 92410. Can you check?"* |
-| *"Fix it"* | Intern doesn't know what "it" is | *"The previous BoltzGen run failed with a CUDA error about `libnvrtc`. Can you fix the library path in the wrapper script?"* |
+| *"Do docking"* | Intern doesn't know which system, files, or protocol | *"Dock the peptide in `raw_input/peptide.pdb` onto the protein in `raw_input/protein.pdb`. Use the same restraints from my best prior run."* |
+| *"Why is it slow?"* | No context on what's running | *"The molecular docking job I started 20 minutes ago seems stuck. PID is 12345. Can you check?"* |
+| *"Fix it"* | Intern doesn't know what "it" is | *"The previous design run failed with a GPU library error. Can you fix the library path in the wrapper script?"* |
 | Asking 5 things at once | Intern may miss one or do them out of order | Break into 2–3 messages, confirm each step |
-| Never correcting the intern | Small errors compound over time | *"Actually, Phe is at position 2, not 3. Please fix the memory entry."* |
+| Never correcting the intern | Small errors compound over time | *"Actually, I meant residue position 2, not position 3. Please fix the memory entry."* |
 | Treating it like a search engine | You get shallow answers instead of experiments | Give it files to read and tasks to execute |
 
 ---
