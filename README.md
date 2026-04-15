@@ -80,7 +80,8 @@ project_magnolia/
 │   ├── bin/                  # Shortcuts to run tools
 │   ├── boltzgen/             # AI design tool
 │   └── manifest.yaml         # List of installed tools
-└── README.md                 # This file
+├── README.md                 # This file
+└── WORKFLOW_GUIDE.md         # How to supervise the intern effectively
 ```
 
 **You mainly work inside `opencode_cc_mem/projects/<your_project_name>/`.** Everything else is managed by Magnolia.
@@ -96,6 +97,8 @@ project_magnolia/
    ```
 3. **Put your input files there** (for example, a protein PDB and a peptide PDB).
 4. **Tell Magnolia what you want**, including where the files are and what you have already tried.
+
+**New to working with AI assistants?** Read [`WORKFLOW_GUIDE.md`](WORKFLOW_GUIDE.md) for a step-by-step example of how to supervise Magnolia effectively — from planning an experiment to analyzing results.
 
 Magnolia will:
 - Check which tools are installed
