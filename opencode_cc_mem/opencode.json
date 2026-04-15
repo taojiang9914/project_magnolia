@@ -5,16 +5,16 @@
       "type": "local",
       "command": ["python", "-m", "compchem_tools.server"],
       "environment": {
-        "MAGNOLIA_SKILLS_DIR": "~/.magnolia/skills",
-        "MAGNOLIA_PROJECT_DIR": "."
+        "MAGNOLIA_SKILLS_DIR": ".magnolia/skills",
+        "MAGNOLIA_PROJECT_DIR": "projects/my_project"
       }
     },
     "compchem-memory": {
       "type": "local",
       "command": ["python", "-m", "compchem_memory.server"],
       "environment": {
-        "MAGNOLIA_SKILLS_DIR": "~/.magnolia/skills",
-        "MAGNOLIA_PROJECT_DIR": "."
+        "MAGNOLIA_SKILLS_DIR": ".magnolia/skills",
+        "MAGNOLIA_PROJECT_DIR": "projects/my_project"
       }
     }
   },
