@@ -38,8 +38,8 @@
   - Fixed. `failure_pattern` added to ENTRY_TYPES with type_boost=2.5. Distiller now extracts unresolved failures from session logs.
 - [ ] **3.3 No session handoff mechanism**
   - Not implemented. No auto-generated summary between sessions.
-- [x] **3.4 Single-session auto-promotion risk**
-  - Identified but not yet fixed. Observations can still all come from one session.
+- [ ] **3.4 Single-session auto-promotion risk**
+  - Not implemented. Observations can still all come from one session. auto_promote_staging uses observation_count without cross-session check.
 - [ ] **3.5 Consolidation destroys knowledge structure**
   - Not implemented. Merge still concatenates without combining frontmatter.
 - [ ] **3.6 No undo or versioning for destructive operations**
