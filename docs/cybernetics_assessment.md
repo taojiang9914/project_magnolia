@@ -16,10 +16,10 @@
   - Partially addressed. Auto-assessment added to `magnolia-run` (fires mechanically after every command).
   - `record_run` now stores `overall` status and `quality_flags` (not just exit_code).
   - Remaining: feed outcomes back into `_score_entry` retrieval scoring (Layer 2).
-- [ ] **2.2 No persistent reference signal (project goal)**
-  - Not implemented. No `GOAL.md` or project-level intent tracking.
-- [ ] **2.3 Unbounded state growth with no true forgetting**
-  - Not implemented. `max_entries` in consolidator is still unenforced. No archival.
+- [x] **2.2 No persistent reference signal (project goal)**
+  - Fixed. GOAL.md added to `.magnolia/` with MCP tools (memory_set_goal, memory_get_goal). Loaded first in context assembly as reference signal.
+- [x] **2.3 Unbounded state growth with no true forgetting**
+  - Fixed. Consolidator now enforces max_entries cap by archiving lowest-confidence entries to `.magnolia/archive/`. `archive/` subdir auto-created.
 
 ### High
 
