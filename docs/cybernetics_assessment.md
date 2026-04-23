@@ -13,9 +13,9 @@
 ### Critical
 
 - [x] **2.1 Open feedback loop: run outcomes do not influence future behavior**
-  - Partially addressed. Auto-assessment added to `magnolia-run` (fires mechanically after every command).
-  - `record_run` now stores `overall` status and `quality_flags` (not just exit_code).
-  - Remaining: feed outcomes back into `_score_entry` retrieval scoring (Layer 2).
+  - Fixed. Auto-assessment fires mechanically via `magnolia-run` after every command.
+  - `record_run` stores `overall` status and `quality_flags`.
+  - **Run outcomes now feed into retrieval scoring:** `_load_recent_run_outcomes()` reads `.magnolia/runs/*.yaml` and maps tool → worst recent status (fail/warning/pass). `_score_entry()` applies 2.0x boost to `error_resolution`/`failure_pattern` entries for tools with recent failures, and 0.7x penalty to `success_pattern` entries for failed tools.
 - [x] **2.2 No persistent reference signal (project goal)**
   - Fixed. GOAL.md added to `.magnolia/` with MCP tools (memory_set_goal, memory_get_goal). Loaded first in context assembly as reference signal.
 - [x] **2.3 Unbounded state growth with no true forgetting**
@@ -23,8 +23,10 @@
 
 ### High
 
-- [ ] **2.4 Confidence only increases, never decreases**
-  - Partially addressed. Confidence decay added to `_score_entry()` — entries lose relevance if `last_verified` is old (half-life ~60 days). Remaining: no negative feedback path for confidence itself.
+- [x] **2.4 Confidence only increases, never decreases**
+  - Fixed. Two mechanisms now provide negative confidence feedback:
+  - Confidence decay in `_score_entry()` — entries lose relevance if `last_verified` is old (half-life ~60 days).
+  - **Negative confidence feedback:** `ProjectManager.decrement_confidence_for_tool()` decrements confidence on `success_pattern` entries when a tool run fails. Called from `post_run_assess` and `cmd_assess`. Only applies to entries not recently verified (older than 7 days). Small decrement (-0.05), floored at 0.
 - [ ] **2.5 Keyword-only retrieval is a severe bottleneck**
   - Not implemented. `_score_entry` still uses word-splitting only.
 - [x] **2.6 Context assembly loads tiers in wrong precedence order**
