@@ -42,8 +42,8 @@
   - Not implemented. No auto-generated summary between sessions.
 - [ ] **3.4 Single-session auto-promotion risk**
   - Not implemented. Observations can still all come from one session. auto_promote_staging uses observation_count without cross-session check.
-- [ ] **3.5 Consolidation destroys knowledge structure**
-  - Not implemented. Merge still concatenates without combining frontmatter.
+- [x] **3.5 Consolidation destroys knowledge structure**
+  - Fixed. `_merge_duplicates` now properly merges frontmatter (max confidence, sum observation_count, union tags/tools) instead of raw file concatenation. `_expire_stale` uses parse-modify-write instead of fragile string replacement. Keeper written before duplicates are unlinked.
 - [ ] **3.6 No undo or versioning for destructive operations**
   - Not implemented. No backup-before-mutate mechanism.
 - [ ] **3.7 Agent's decision rationale is invisible**
