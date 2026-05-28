@@ -57,20 +57,28 @@ Verify the entry exists without revealing content:
 pass show univ-cotedazur/vpn >/dev/null && echo "decrypts cleanly"
 ```
 
-### 1.3 NOPASSWD sudoers rule for openconnect
+### 1.3 NOPASSWD sudoers rule for openconnect + pkill
 
 ```bash
 sudo install -m 0440 -o root -g root /dev/stdin /etc/sudoers.d/openconnect <<'EOF'
 # Allow tjiang to run openconnect as root without a password.
 # Required for the hpc_tunnel.sh unattended-startup pattern.
 tjiang ALL=(root) NOPASSWD: /usr/sbin/openconnect
+
+# Allow tearing down openconnect via pkill — needed for the tunnel
+# integration test (M4.5) and idempotency test (M5.3). The argument glob
+# matches any `pkill -f openconnect*` invocation; the actual pattern used
+# by hpc_tunnel.sh teardown is 'openconnect.*open\.unice\.fr'.
+tjiang ALL=(root) NOPASSWD: /usr/bin/pkill -f openconnect*
 EOF
 
 sudo visudo -c -f /etc/sudoers.d/openconnect
 # Expected: /etc/sudoers.d/openconnect: parsed OK
 ```
 
-This grants password-less sudo **only for `/usr/sbin/openconnect`** — every other `sudo <anything>` still prompts. Arguments are not restricted, which is intentional (tight arg-matching in sudoers breaks on openconnect version bumps); see `rules/hpc_azzurra.md` for the threat-model discussion.
+This grants password-less sudo **only for `/usr/sbin/openconnect`** and **`/usr/bin/pkill -f openconnect*`** — every other `sudo <anything>` still prompts. Arguments aren't restricted on openconnect (tight arg-matching breaks on version bumps); pkill is restricted to invocations targeting openconnect-related processes only.
+
+**Gotcha discovered during M4.5:** the original `hpc_tunnel.sh` check `sudo -n true` produced false-negatives on this minimal NOPASSWD scope (true isn't in the allowlist). Fixed in commit `f383fb3` by switching the check to `sudo -n -l /usr/sbin/openconnect`, which tests the actual permission we need.
 
 ### 1.4 SSH config
 
@@ -274,21 +282,17 @@ ncores adjusted from 40 (the example default) to 4 (final attempt) to minimize r
 
 **Resolution:** Job 11331414 is left in the queue. When it eventually runs (cluster permitting), check with `ssh azzurra 'sacct -j 11331414 --format=JobID,State,ExitCode,Elapsed -X -n'`. Re-submit fresh if the queue has cleared.
 
-### 5.3 hpc_tunnel.sh idempotency
+### 5.3 hpc_tunnel.sh idempotency + M4.5 integration test
 
-Run locally on the WSL workstation. **Requires sudo interactively** for the teardown step (the NOPASSWD rule only covers `openconnect`, not `kill`/`pkill`):
+After extending the NOPASSWD rule (§1.3) to include `pkill -f openconnect*`, both M4.5 and M5.3 ran inline:
 
-```bash
-SCRIPT=opencode_cc_mem/softwares/bin/hpc_tunnel.sh
-# Cold start
-sudo pkill -f 'openconnect.*open\.unice\.fr'; sleep 2
-$SCRIPT  # expect: bound :1080 in 2-5s, exit 0
-$SCRIPT  # expect: "tunnel already up", exit 0 in <1s
-```
+| Phase | Result |
+|---|---|
+| Cold-start (script bootstraps tunnel from down state) | ✅ exit 0, wall 1.36s; **zombie-wrapper detection from M4 fix triggered** (a stale bash wrapper was found but :1080 wasn't bound, so the script correctly fell through to a clean restart instead of false-positiving) |
+| Warm-path idempotency (re-invoke while tunnel up) | ✅ exit 0, wall 0.15s, logs `tunnel already up (openconnect process + :1080 bound)` |
+| Real ssh through brought-up tunnel | ✅ `tjiang@login-hpc.cluster.local`, kernel 5.14.0, date verified |
 
-**Status: deferred (user-assisted).** This test requires `sudo` for the teardown step (kill openconnect), which our NOPASSWD rule deliberately doesn't cover. Run manually when at the keyboard.
-
-**Component-level verification done:** `hpc_tunnel.sh` cold-start path was exercised earlier in this session (M1.4) and bound `:1080` in ~2 seconds with a successful `ssh azzurra` follow-up. The 6 unit tests (committed in `54f3564`) cover all four early-exit branches plus the zombie-wrapper and missing-user paths.
+The script behaves correctly under the new minimum-friction NOPASSWD policy. Commit `f383fb3` (`fix(hpc): test openconnect-specific sudo permission, not sudo -n true`) was a real bug fix that surfaced during this test — the original check `sudo -n true` was too broad and produced false-negative exit 3 when the NOPASSWD scope was tight.
 
 ## 6. Cluster facts discovered (synced into rules/hpc_azzurra.md)
 
@@ -339,6 +343,7 @@ These extended what was previously documented:
 | `haddock3 --version` works but workflow fails with "CNS executable not found" | pip-installed wheel doesn't bundle CNS | Copy CNS from a local bioconda install (or from another working academic install); place at `<haddock>/cns/bin/x86_64-linux.bin` |
 | `git add hpc_tunnel.sh` is silently a no-op | `.gitignore` has a broad `opencode_cc_mem/softwares/bin/*` ignore with only `!magnolia-*` allowlisted | Add a specific `!opencode_cc_mem/softwares/bin/hpc_tunnel.sh` negation |
 | `pgrep -f openconnect` returns false-positive on the wrapper bash | The `nohup bash -c "...openconnect..."` parent shell matches the `-f` pattern | Require BOTH pgrep match AND port LISTEN before declaring "tunnel up" (fixed in `hpc_tunnel.sh` commit `54f3564`) |
+| `hpc_tunnel.sh` exits 3 ("NOPASSWD rule missing") even when openconnect runs fine via sudo | Script tested `sudo -n true` (requires NOPASSWD for `/usr/bin/true`) instead of `sudo -n -l /usr/sbin/openconnect` (tests the actual permission) | Fixed in commit `f383fb3` |
 
 ## 9. Replicating this on a fresh account
 
