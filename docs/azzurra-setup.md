@@ -269,18 +269,33 @@ Inputs: 3-atom water `h2o.xyz`. Verified output:
 
 ### 5.2 HADDOCK3 protein-protein
 
-Run dir: `/workspace/tjiang/magnolia/smoke/runs/2026-05-28_haddock3_pp/`
-Config: `docking-protein-protein-test.cfg` from `~/src/haddock3-source/examples/docking-protein-protein/` (cloned from `haddocking/haddock3` GitHub repo since pip-installed wheel does not ship examples).
+**Status: PASSED** (job 11331448, gpu partition).
 
-**Status: deferred (scheduler-bound).** Two submission attempts (job IDs 11331412 with 16 cores, then 11331414 with 4 cores) both landed `PENDING (reason: Priority)`. The `cpucourt` partition was at 78/0/4/82 (zero idle nodes) and the `spectrometry` QOS was being deprioritized by the scheduler with an estimated start ~20 hours out. Other partitions are restricted to other accounts (see §6 "Accounts/QOS").
+**Path to success — two key discoveries:**
 
-ncores adjusted from 40 (the example default) to 4 (final attempt) to minimize resource pressure. Sampling kept at 20 (small).
+1. **`spectrometry` has gpu-partition access** (initially missed in the long AllowAccounts list). The gpu partition had **136 idle CPUs** even when `cpucourt` was fully allocated. Submitting CPU-only HADDOCK3 work to the gpu partition (without claiming a GPU via `--gres`) is a legitimate way to bypass cpucourt fragmentation.
 
-**Component-level verification done:** HADDOCK3 2026.5.0 imports cleanly; `haddock.libs.libutil.get_cns_executable()` resolves to the placed CNS binary; the CNS binary runs and prints the HADDOCK-patched banner; `module purge && module load haddock3/local && haddock3 --version` succeeds from a clean shell. The component installation is confirmed working.
+2. **Use `docking-exit-test.cfg`** (not `docking-protein-protein-test.cfg`) — it has an `[exit]` module immediately after `[rigidbody]`, so HADDOCK3 stops after the cheap modules and skips slow `flexref` / `emref` / clustering. Drops wall time from ~10-15 min to <1 min.
 
-**What remains unverified:** end-to-end workflow execution (topoaa → rigidbody → flexref → emref → caprieval → ...). This is a confidence boost, not a discovery — the components are individually tested.
+**Initial attempts (deferred):**
+- Job 11331412 (16 cores, cpucourt): `PENDING (Priority)` — cluster fully allocated
+- Job 11331414 (4 cores, cpucourt): `PENDING (Priority)` — same; cancelled later
+- Job 11331446 (4 cores, gpu, sampling=2): **FAILED in 15s** — `Sampling is smaller than the number of model combinations #model_combinations=10, sampling=2`. The hpr ensemble PDB has 5 conformations × 2 receptor combos = 10 combinations; HADDOCK3 requires `sampling >= combinations`. Useful failure: confirms topoaa runs end-to-end (11 CNS topology jobs completed in 2s before rigidbody rejected the config).
 
-**Resolution:** Job 11331414 is left in the queue. When it eventually runs (cluster permitting), check with `ssh azzurra 'sacct -j 11331414 --format=JobID,State,ExitCode,Elapsed -X -n'`. Re-submit fresh if the queue has cleared.
+**Successful run:** Job **11331448** — `docking-exit-test.cfg`, sampling=10, ncores=4, gpu partition.
+
+| Phase | Wall |
+|---|---|
+| Queue wait | <10 s |
+| `[topoaa]` (11 CNS topology jobs, 4-way parallel) | 2 s |
+| `[rigidbody]` (10 docking poses, CNS) | ~32 s |
+| `haddock3-traceback` + cleanup | ~4 s |
+| **Total cluster wall** | **42 s** |
+| **HADDOCK3 internal wall** | **38 s** |
+
+Final state: `COMPLETED` ExitCode `0:0` on `gpu06` (H100 node, used for spare CPUs). Output: `run1-exit-test/{00_topoaa,01_rigidbody,traceback,analysis,log}/`.
+
+**Smoke run dir for inspection:** `/workspace/tjiang/magnolia/smoke/runs/2026-05-28_haddock3_pp_fast/`.
 
 ### 5.3 hpc_tunnel.sh idempotency + M4.5 integration test
 
