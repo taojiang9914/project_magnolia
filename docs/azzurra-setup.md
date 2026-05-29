@@ -373,3 +373,46 @@ If you're a future-you or a collaborator setting up from scratch:
 7. Smoke-test with §5.1 and §5.2 examples. Both should complete in <15 min.
 
 If anything diverges from this document, prefer **`rules/hpc_azzurra.md`** as the authoritative reference.
+
+## 10. MCP tools for Azzurra (Sub-project B)
+
+Sub-project B (spec: `docs/superpowers/specs/2026-05-29-hpc-azzurra-remote-submission-design.md`, plan: `docs/superpowers/plans/2026-05-29-hpc-azzurra-remote-submission.md`) extends Magnolia's compchem-tools MCP server so the agent can drive Azzurra without the user typing `ssh azzurra '…'` by hand. Four MCP tools are exposed:
+
+| Tool | What it does |
+|---|---|
+| `submit_job(scheduler="ssh-slurm", command, working_dir, project_dir, cluster="azzurra", tool="haddock3", ...)` | Brings the tunnel up if down, rsyncs the run dir to `/workspace/<user>/magnolia/<project>/runs/<run_id>/`, ssh's `sbatch`, returns the Slurm job_id. Writes `runs/<id>.yaml` with `lifecycle: submitted` and full `remote:` block. |
+| `check_job(job_id, scheduler="ssh-slurm", cluster="azzurra", project_dir=...)` | ssh sacct → state + sacct resource fields (max_rss, elapsed, ave_cpu, node). Falls back to squeue for in-queue jobs. Updates the YAML's `lifecycle` and `remote.slurm.*` fields. Returns `terminal: bool`. |
+| `cancel_job(job_id, scheduler="ssh-slurm", cluster="azzurra", project_dir=...)` | ssh scancel; sets the YAML to `lifecycle: cancelled`. |
+| `fetch_job_results(job_id, project_dir=...)` | Looks up the run by job_id, rsyncs the remote run dir back to its recorded local path, updates YAML to `lifecycle: fetched` and stamps `remote.fetched_at`. |
+
+`runs/INDEX.yaml` is auto-maintained as flow-style YAML (one record per line) with the new `cluster`, `job_id`, `slurm_state`, `elapsed`, `node` columns. `grep azzurra runs/INDEX.yaml` returns full rows; `grep TIMEOUT runs/INDEX.yaml` lists timeouts with full identifying context per line.
+
+**What's NOT in B** (deferred to Sub-project C):
+- Auto-polling without a live session
+- Auto-fetch on terminal state
+- Auto `post_run_assess` after fetch
+
+For manual ad-hoc work, the shell aliases from §1.5 (`azzurra-status`, `azzurra`) remain useful — they're independent of the MCP tools.
+
+### Restart discipline
+
+Because B touches both MCP server packages (compchem-memory and compchem-tools), opencode must be restarted after merging to master to pick up the changes:
+- After M1 lands on master: restart for compchem-memory's new `record_run` kwargs + `update_run` + flow-style INDEX
+- After M7 lands on master: restart for compchem-tools' ssh-slurm dispatch + `fetch_job_results` tool
+
+A single restart after the full Sub-project B merge covers both.
+
+### Test coverage
+
+Sub-project B ships with:
+- **47 unit tests** in `compchem-tools/tests/test_ssh_slurm.py` covering all four entry points + helpers + 4 error paths + 3 dispatch tests + 1 MCP wrapper test. Uses a `fake_subprocess` fixture (in `tests/conftest.py`) to avoid touching the real network.
+- **6 unit tests** in `compchem-memory/tests/test_project_extensions.py` for the ProjectManager extensions, including a backward-compat test that verifies legacy callers continue to work.
+- **1 gated integration test** in `compchem-tools/tests/test_ssh_slurm_integration.py` that runs against the live cluster when `MAGNOLIA_INTEGRATION_AZZURRA=1` is set. Submits a tiny `echo + sleep + cat` job to the `gpu` partition, polls to completion, fetches results, verifies on-disk content.
+
+Run the gated test with:
+```
+cd opencode_cc_mem/mcp-servers/compchem-tools && \
+    MAGNOLIA_INTEGRATION_AZZURRA=1 \
+    PYTHONPATH=src:../compchem-memory/src \
+    pytest tests/test_ssh_slurm_integration.py -v -s
+```
