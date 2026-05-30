@@ -464,6 +464,11 @@ reconstruct the run.
   up the new tool + timer.
 - Force an immediate sweep with the MCP tool `poll_jobs` (or set a
   shorter interval temporarily via `MAGNOLIA_POLL_INTERVAL_MIN`).
+- If `submit_job` fails at the rsync or sbatch stage, a `lifecycle=submitting`
+  breadcrumb YAML remains in `<project>/.magnolia/runs/`. The poller correctly
+  skips these (no `job_id`). To find them:
+  `grep -l "lifecycle: submitting" <project>/.magnolia/runs/*.yaml`.
+  Delete what looks orphaned.
 
 ### Test coverage
 - Unit (no network): `compchem-memory` — `tests/test_atomic_io.py`,
