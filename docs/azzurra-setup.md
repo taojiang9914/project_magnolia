@@ -416,3 +416,61 @@ cd opencode_cc_mem/mcp-servers/compchem-tools && \
     PYTHONPATH=src:../compchem-memory/src \
     pytest tests/test_ssh_slurm_integration.py -v -s
 ```
+
+## 11. Async job lifecycle (Sub-project C)
+
+After Sub-project C, the `compchem-tools` MCP server runs a background
+daemon thread that polls all ssh-slurm jobs in this project on a wall-clock
+interval. No more manual `check_job → fetch_job_results → post_run_assess`
+chains — submit a job and walk away.
+
+### Interval & env vars
+- `MAGNOLIA_POLL_INTERVAL_MIN` (default `5`) — how often to sweep.
+- Set to `0`/negative/non-int → falls back to default.
+
+### Lifecycle (per run YAML's `lifecycle` field)
+- `submitting` — write-ahead breadcrumb; sbatch in flight.
+- `submitted` — sbatch returned a job_id, queued.
+- `running` — `sacct` reports R/PD/CF/S/CG.
+- `completed` — terminal success (sacct `COMPLETED`).
+- `failed` — terminal failure (science, infra, or unknown state).
+- `cancelled` — terminal via scancel.
+- `fetched` — results rsynced back; for success, `assess_and_record` ran.
+
+### Terminal-state policy
+| sacct state | Action |
+|---|---|
+| `COMPLETED` | fetch + assess (sets scientific `status`) |
+| `FAILED` / `TIMEOUT` / `OUT_OF_MEMORY` / `REVOKED` | fetch + capture log tails + staging memory entry |
+| `NODE_FAIL` / `BOOT_FAIL` / `PREEMPTED` / `DEADLINE` | flag `remote.retry_recommended=true`; no fetch |
+| `CANCELLED` (by you) | record state; no fetch |
+| anything else | conservative — fetch + capture |
+
+### Self-describing remote dirs (L4)
+Every remote run dir contains:
+- `.magnolia/manifest.json` — run_id, tool, project, account/qos/partition, command, submitted_at.
+- `.magnolia/jobid` — stamped by the job at runtime via `echo "$SLURM_JOB_ID"`.
+
+So even if the local YAML is lost, you can `rsync` the remote dir and
+reconstruct the run.
+
+### Operator notes
+- The poller runs **only while opencode is open** (it lives inside the
+  `compchem-tools` MCP subprocess). Jobs that finish during a closure are
+  fetched on the next opencode start (a startup catch-up sweep runs
+  immediately, before the interval loop). If the cluster scratch is purged
+  before reopen, results are lost — see `todo.md` L5 (deferred reconcile).
+- Restart opencode after merging C to master so the MCP subprocess picks
+  up the new tool + timer.
+- Force an immediate sweep with the MCP tool `poll_jobs` (or set a
+  shorter interval temporarily via `MAGNOLIA_POLL_INTERVAL_MIN`).
+
+### Test coverage
+- Unit (no network): `compchem-memory` — `tests/test_atomic_io.py`,
+  `tests/test_atomic_record_run.py`, `tests/test_index_robustness.py`,
+  `tests/test_orchestrator.py`, `tests/test_post_run_assess_parity.py`.
+  `compchem-tools` — `tests/test_poller.py`, `tests/test_poll_jobs_tool.py`,
+  `tests/test_submit_writeahead.py`, `tests/test_sbatch_template.py`.
+- Gated integration: `MAGNOLIA_INTEGRATION_AZZURRA=1`
+  → `tests/test_ssh_slurm_integration.py::test_poll_drives_short_job_to_fetched`
+  + `test_poll_captures_failed_job`.
